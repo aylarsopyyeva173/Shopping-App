@@ -1,530 +1,329 @@
+#include "produs.hpp"
+#include "client.hpp"
+#include "comanda.hpp"
+#include "ierarhie.hpp"
+#include "plata_crypto.hpp"
+#include "exceptions.hpp"
 #include <iostream>
+#include <memory>
 #include <vector>
-#include <string>
-#include <iomanip>
-#include <fstream>
-#include <ctime>
+#include <limits>
 
-class Client {
-private:
-    std::string nume;
-    std::string prenume;
-    std::string adresa;
-    std::string telefon;
-    std::string email;
+using namespace std;
 
-public:
-    Client(const std::string& nume, const std::string& prenume, const std::string& adresa,
-             const std::string& telefon, const std::string& email)
-        : nume(nume), prenume(prenume), adresa(adresa), telefon(telefon), email(email) {}
+// Yardımcı fonksiyonlar
+void afisareMeniu() {
+    cout << "\n=== SISTEM MAGAZIN ONLINE ===\n"
+         << "1. Adauga client\n"
+         << "2. Afiseaza clienti\n"
+         << "3. Creeaza comanda\n"
+         << "4. Afiseaza comenzi\n"
+         << "5. Demo polimorfism plati\n"
+         << "6. Statistici\n"
+         << "7. Iesire\n"
+         << "Alegere: ";
+}
 
-    std::string getNume() const { return nume; }
-    std::string getPrenume() const { return prenume; }
-    std::string getAdresa() const { return adresa; }
-    std::string getTelefon() const { return telefon; }
-    std::string getEmail() const { return email; }
+Adresa citesteAdresa() {
+    string strada, oras, codPostal;
+    int numar;
 
-    void afiseazaInformatii() const {
-        std::cout << "\n=== INFORMATII CLIENT ===\n";
-        std::cout << "Nume Prenume: " << nume << " " << prenume << std::endl;
-        std::cout << "Telefon: " << telefon << std::endl;
-        std::cout << "E-mail: " << email << std::endl;
-        std::cout << "Adresa: " << adresa << std::endl;
-    }
-};
+    cout << "--- Introduceti adresa ---\n";
+    cout << "Strada: ";
+    getline(cin, strada);
+    cout << "Oras: ";
+    getline(cin, oras);
+    cout << "Cod postal: ";
+    getline(cin, codPostal);
+    cout << "Numar apartament: ";
+    cin >> numar;
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
 
-class Produs {
-private:
-    int id;
-    std::string nume;
-    double pret;
-    int stoc;
-    std::string categorie;
+    return Adresa(strada, oras, codPostal, numar);
+}
 
-public:
-    Produs(int id, const std::string& nume, double pret, int stoc, const std::string& categorie)
-        : id(id), nume(nume), pret(pret), stoc(stoc), categorie(categorie) {}
+Client citesteClient() {
+    string nume, email, telefon;
 
-    int getId() const { return id; }
-    std::string getNume() const { return nume; }
-    double getPret() const { return pret; }
-    int getStoc() const { return stoc; }
-    std::string getCategorie() const { return categorie; }
+    cout << "--- Introduceti date client ---\n";
+    cout << "Nume: ";
+    getline(cin, nume);
+    cout << "Email: ";
+    getline(cin, email);
+    cout << "Telefon: ";
+    getline(cin, telefon);
 
-    void setPret(double pretNou) { pret = pretNou; }
-    void setStoc(int stocNou) { stoc = stocNou; }
+    Adresa a = citesteAdresa();
+    string id = "C" + to_string(time(nullptr) % 1000);
 
-    void scadeStoc(int cantitate) {
-        stoc -= cantitate;
-        if (stoc < 0) stoc = 0;
-    }
+    return Client(id, nume, email, telefon, a);
+}
 
-    void afiseaza() const {
-        std::cout << std::setw(3) << id << " | "
-                  << std::setw(20) << std::left << nume << " | "
-                  << std::setw(8) << std::right << std::fixed << std::setprecision(2) << pret << " RON | "
-                  << std::setw(4) << stoc << " | "
-                  << std::setw(15) << std::left << categorie << std::endl;
-    }
-};
+void demoPolimorfismPlati() {
+    cout << "\n=== DEMO POLIMORFISM PLATI ===\n";
 
-class ItemCos {
-private:
-    Produs produs;
-    int cantitate;
+    vector<unique_ptr<Plata>> plati;
 
-public:
-    ItemCos(const Produs& produs, int cantitate) : produs(produs), cantitate(cantitate) {}
+    // Farklı ödeme türleri oluştur
+    plati.push_back(make_unique<PlataCard>("CARD001", 150.0,
+                                           "4111111111111111", "12/25"));
+    plati.push_back(make_unique<PlataTransfer>("TRF001", 300.0,
+                                               "RO49AAAA1B31007593840000",
+                                               "BCR"));
+    plati.push_back(make_unique<PlataCash>("CASH001", 50.0,
+                                           "Magazin Central"));
+    plati.push_back(make_unique<PlataCrypto>("CRYPTO001", 200.0,
+                                            "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+                                            "BTC", 50000.0));
 
-    Produs getProdus() const { return produs; }
-    int getCantitate() const { return cantitate; }
-    double getPretTotal() const { return produs.getPret() * cantitate; }
+    // Polimorfik çağrılar
+    for (const auto& plata : plati) {
+        cout << "\n";
+        plata->afiseazaDetalii();
+        cout << "Comision: $" << plata->calculeazaComision() << endl;
 
-    void afiseaza() const {
-        std::cout << "• " << produs.getNume() << " x " << cantitate << " = "
-                  << std::fixed << std::setprecision(2) << getPretTotal() << " RON\n";
-    }
-};
-
-class CosCumparaturi {
-private:
-    std::vector<ItemCos> iteme;
-    Client client;
-
-public:
-    CosCumparaturi(const Client& client) : client(client) {}
-
-    void adaugaProdus(const Produs& produs, int cantitate) {
-        if (produs.getStoc() < cantitate) {
-            std::cout << "❌ Stoc insuficient! Disponibil: " << produs.getStoc() << std::endl;
-            return;
+        // Dynamic cast ile özel işlemler
+        if (auto* crypto = dynamic_cast<PlataCrypto*>(plata.get())) {
+            cout << "Suma in BTC: " << crypto->calculeazaSumaInCrypto() << endl;
+            cout << "QR Code: " << crypto->genereazaQRCode() << endl;
         }
 
-        // Verifică dacă produsul există deja în coș
-        for (auto& item : iteme) {
-            if (item.getProdus().getId() == produs.getId()) {
-                std::cout << " Acest produs este deja in cos! Cantitatea este actualizata.\n";
-                return;
+        // Ödeme işlemini dene
+        try {
+            if (plata->proceseazaPlata()) {
+                cout << "Status: SUCCES\n";
+            } else {
+                cout << "Status: ESEC\n";
             }
-        }
-
-        iteme.push_back(ItemCos(produs, cantitate));
-        std::cout << "✅ " << cantitate << " bucati " << produs.getNume() << " au fost adaugate in cos.\n";
-    }
-
-    void afiseazaCos() const {
-        if (iteme.empty()) {
-            std::cout << "🛒 Cosul dvs. este gol.\n";
-            return;
-        }
-
-        double total = 0.0;
-        std::cout << "\n=== COSUL DVS. ===\n";
-        for (const auto& item : iteme) {
-            item.afiseaza();
-            total += item.getPretTotal();
-        }
-        std::cout << "────────────────────────────\n";
-        std::cout << "Total: " << std::fixed << std::setprecision(2) << total << " RON\n";
-    }
-
-    double getTotal() const {
-        double total = 0.0;
-        for (const auto& item : iteme) {
-            total += item.getPretTotal();
-        }
-        return total;
-    }
-
-    void golesteCos() {
-        iteme.clear();
-        std::cout << "  Cosul a fost golit.\n";
-    }
-
-    bool esteGol() const {
-        return iteme.empty();
-    }
-
-    const std::vector<ItemCos>& getIteme() const {
-        return iteme;
-    }
-
-    Client getClient() const {
-        return client;
-    }
-};
-
-class ManagerProduse {
-private:
-    std::vector<Produs> produse;
-
-public:
-    ManagerProduse() {
-        incarcaProduseExemplu();
-    }
-
-    void incarcaProduseExemplu() {
-        produse.push_back(Produs(1, "Laptop Gaming", 8999.99, 10, "Electronice"));
-        produse.push_back(Produs(2, "Mouse Wireless", 199.50, 25, "Accesorii"));
-        produse.push_back(Produs(3, "Tastatura Mecanica", 450.00, 15, "Accesorii"));
-        produse.push_back(Produs(4, "Monitor 24 inch", 1999.99, 8, "Electronice"));
-        produse.push_back(Produs(5, "Căști Bluetooth", 299.99, 20, "Audio"));
-        produse.push_back(Produs(6, "Tableta", 2499.99, 12, "Electronice"));
-        produse.push_back(Produs(7, "Powerbank", 399.50, 30, "Accesorii"));
-    }
-
-    void afiseazaToateProdusele() {
-        if (produse.empty()) {
-            std::cout << "Inca nu exista produse in sistem.\n";
-            return;
-        }
-
-        std::cout << "\n=== TOATE PRODUSELE ===\n";
-        std::cout << "ID | Nume Produs           | Pret     | Stoc | Categorie" << std::endl;
-        std::cout << "-------------------------------------------------------" << std::endl;
-
-        for (const auto& produs : produse) {
-            produs.afiseaza();
+        } catch (const exception& e) {
+            cout << "Eroare: " << e.what() << endl;
         }
     }
+}
 
-    void adaugaProdus() {
-        int id, stoc;
-        double pret;
-        std::string nume, categorie;
+int main() {
+    vector<Client> clienti;
+    vector<Produs> produse;
+    vector<unique_ptr<Comanda>> comenzi;
 
-        std::cout << "ID Produs: ";
-        std::cin >> id;
+    // Başlangıç ürünleri
+    produse.push_back(Produs("P001", "Camasa clasica", "Camasi", 129.99, 10, "M"));
+    produse.push_back(Produs("P002", "Blugi", "Pantaloni", 199.99, 5, "L"));
+    produse.push_back(Produs("P003", "Geaca piele", "Jachete", 449.99, 3, "XL"));
+    produse.push_back(Produs("P004", "Pulover tricotat", "Pulovere", 179.99, 8, "M"));
 
-        for (const auto& produs : produse) {
-            if (produs.getId() == id) {
-                std::cout << " Eroare: Acest ID exista deja!\n";
-                return;
-            }
-        }
+    int alegere;
 
-        std::cin.ignore();
-        std::cout << "Nume Produs: ";
-        std::getline(std::cin, nume);
-
-        std::cout << "Pret: ";
-        std::cin >> pret;
-
-        std::cout << "Stoc: ";
-        std::cin >> stoc;
-
-        std::cin.ignore();
-        std::cout << "Categorie: ";
-        std::getline(std::cin, categorie);
-
-        produse.push_back(Produs(id, nume, pret, stoc, categorie));
-        std::cout << "Produs adaugat cu succes!\n";
-    }
-
-    void actualizeazaStoc() {
-        int id, cantitate;
-        std::cout << "ID Produs: ";
-        std::cin >> id;
-
-        std::cout << "Modificare stoc (+ sau -): ";
-        std::cin >> cantitate;
-
-        for (auto& produs : produse) {
-            if (produs.getId() == id) {
-                int stocNou = produs.getStoc() + cantitate;
-                if (stocNou < 0) {
-                    std::cout << "Eroare: Stocul nu poate fi negativ!\n";
-                    return;
-                }
-                produs.setStoc(stocNou);
-                std::cout << " Stoc actualizat. Stoc nou: " << stocNou << std::endl;
-                return;
-            }
-        }
-
-        std::cout << " Produsul nu a fost gasit.\n";
-    }
-
-    void stergeProdus() {
-        int id;
-        std::cout << "ID-ul produsului de sters: ";
-        std::cin >> id;
-
-        for (auto it = produse.begin(); it != produse.end(); ++it) {
-            if (it->getId() == id) {
-                std::cout << " Produs șters: " << it->getNume() << std::endl;
-                produse.erase(it);
-                return;
-            }
-        }
-
-        std::cout << "❌ Produsul nu a fost gasit.\n";
-    }
-
-    void afiseazaProdusePentruClient() {
-        std::cout << "\n  PRODUSE DISPONIBILE\n";
-        std::cout << "ID | Nume Produs           | Pret     | Stoc | Categorie" << std::endl;
-        std::cout << "-------------------------------------------------------" << std::endl;
-
-        bool produseDisponibile = false;
-        for (const auto& produs : produse) {
-            if (produs.getStoc() > 0) {
-                produs.afiseaza();
-                produseDisponibile = true;
-            }
-        }
-
-        if (!produseDisponibile) {
-            std::cout << "  Momentan nu exista produse disponibile.\n";
-        }
-    }
-
-    Produs* gasesteProdus(int id) {
-        for (auto& produs : produse) {
-            if (produs.getId() == id) {
-                return &produs;
-            }
-        }
-        return nullptr;
-    }
-
-    Client citesteDateClient() {
-        std::string nume, prenume, adresa, telefon, email;
-
-        std::cin.ignore();
-        std::cout << "\n=== DATE CLIENT ===\n";
-        std::cout << "Nume: ";
-        std::getline(std::cin, nume);
-
-        std::cout << "Prenume: ";
-        std::getline(std::cin, prenume);
-
-        std::cout << "Telefon: ";
-        std::getline(std::cin, telefon);
-
-        std::cout << "E-mail: ";
-        std::getline(std::cin, email);
-
-        std::cout << "Adresa: ";
-        std::getline(std::cin, adresa);
-
-        return Client(nume, prenume, adresa, telefon, email);
-    }
-
-    void proceseazaComanda(CosCumparaturi& cos) {
-        if (cos.esteGol()) {
-            std::cout << " Cosul dvs. este gol!\n";
-            return;
-        }
-
-        std::cout << "\n REZUMAT COMANDA\n";
-        cos.afiseazaCos();
-        cos.getClient().afiseazaInformatii();
-
-        std::cout << "\nConfirmati comanda? (d/n): ";
-        char confirmare;
-        std::cin >> confirmare;
-
-        if (confirmare == 'd' || confirmare == 'D') {
-            // Actualizează stocurile
-            for (const auto& item : cos.getIteme()) {
-                Produs* produs = gasesteProdus(item.getProdus().getId());
-                if (produs) {
-                    produs->scadeStoc(item.getCantitate());
-                }
-            }
-
-            // Salvează comanda în fișier
-            salveazaComandaInFisier(cos);
-
-            std::cout << "\n Comanda dvs. a fost plasata cu succes! Va multumim.\n";
-            std::cout << " Comanda dvs. va fi procesata în cel mai scurt timp.\n";
-            cos.golesteCos();
-        } else {
-            std::cout << " Comanda a fost anulata.\n";
-        }
-    }
-
-    void salveazaComandaInFisier(const CosCumparaturi& cos) {
-        std::ofstream fisier("comenzi.txt", std::ios::app);
-        if (fisier.is_open()) {
-            time_t acum = time(0);
-            char* dataOra = ctime(&acum);
-
-            fisier << "\n=== COMANDA NOUĂ ===\n";
-            fisier << "Data comenzii: " << dataOra;
-            fisier << "Client: " << cos.getClient().getNume() << " " << cos.getClient().getPrenume() << std::endl;
-            fisier << "Telefon: " << cos.getClient().getTelefon() << std::endl;
-            fisier << "E-mail: " << cos.getClient().getEmail() << std::endl;
-            fisier << "Adresa: " << cos.getClient().getAdresa() << std::endl;
-            fisier << "Produse:\n";
-
-            for (const auto& item : cos.getIteme()) {
-                fisier << "- " << item.getProdus().getNume() << " x " << item.getCantitate()
-                     << " = " << std::fixed << std::setprecision(2) << item.getPretTotal() << " RON\n";
-            }
-
-            fisier << "Total de plată: " << std::fixed << std::setprecision(2) << cos.getTotal() << " RON\n";
-            fisier << "================================\n";
-            fisier.close();
-
-            std::cout << " Detaliile comenzii au fost salvate în 'comenzi.txt'.\n";
-        }
-    }
-};
-
-class Aplicatie {
-private:
-    ManagerProduse manager;
-    CosCumparaturi* cosCurent;
-
-public:
-    Aplicatie() : cosCurent(nullptr) {}
-
-    ~Aplicatie() {
-        if (cosCurent != nullptr) {
-            delete cosCurent;
-        }
-    }
-
-    void afiseazaMeniuVanzator() {
-        std::cout << "\n=== PANEL VANZATOR ===\n";
-        std::cout << "1. Afișeaza toate produsele\n";
-        std::cout << "2. Adauga produs nou\n";
-        std::cout << "3. Actualizeaza stoc\n";
-        std::cout << "4. Sterge produs\n";
-        std::cout << "5. Mergi la panel client\n";
-        std::cout << "0. Iesire\n";
-        std::cout << "Alegeti optiunea: ";
-    }
-
-    void afiseazaMeniuClient() {
-        std::cout << "\n=== PANEL CLIENT ===\n";
-        std::cout << "1. Listeaza produse\n";
-        std::cout << "2. Adauga in cos\n";
-        std::cout << "3. Afișeaza cos\n";
-        std::cout << "4. Finalizeaza comanda\n";
-        std::cout << "5. Goleste cos\n";
-        std::cout << "6. Mergi la panel vanzator\n";
-        std::cout << "0. Iesire\n";
-        std::cout << "Alegeti optiunea: ";
-    }
-
-    void ruleazaPanelVanzator() {
-        int optiune;
+    try {
         do {
-            afiseazaMeniuVanzator();
-            std::cin >> optiune;
+            afisareMeniu();
+            cin >> alegere;
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
 
-            switch (optiune) {
-                case 1:
-                    manager.afiseazaToateProdusele();
+            switch (alegere) {
+                case 1: { // Adauga client
+                    Client c = citesteClient();
+                    clienti.push_back(c);
+                    cout << "\nClient adaugat cu succes!\n";
+                    cout << c << endl;
                     break;
-                case 2:
-                    manager.adaugaProdus();
-                    break;
-                case 3:
-                    manager.actualizeazaStoc();
-                    break;
-                case 4:
-                    manager.stergeProdus();
-                    break;
-                case 5:
-                    return;
-                case 0:
-                    std::cout << "Aplicația se închide...\n";
-                    exit(0);
-                default:
-                    std::cout << " Opțiune invalida!\n";
-            }
-        } while (true);
-    }
+                }
 
-    void ruleazaPanelClient() {
-        // Autentificare client
-        if (cosCurent == nullptr) {
-            std::cout << "\n Introduceti datele dvs.:\n";
-            Client client = manager.citesteDateClient();
-            cosCurent = new CosCumparaturi(client);
-        }
-
-        int optiune;
-        do {
-            afiseazaMeniuClient();
-            std::cin >> optiune;
-
-            switch (optiune) {
-                case 1:
-                    manager.afiseazaProdusePentruClient();
-                    break;
-                case 2:
-                    {
-                        int idProdus, cantitate;
-                        std::cout << "ID Produs: ";
-                        std::cin >> idProdus;
-                        std::cout << "Cantitate: ";
-                        std::cin >> cantitate;
-
-                        Produs* produs = manager.gasesteProdus(idProdus);
-                        if (produs) {
-                            cosCurent->adaugaProdus(*produs, cantitate);
-                        } else {
-                            std::cout << "Produsul nu a fost găsit!\n";
+                case 2: { // Afiseaza clienti
+                    if (clienti.empty()) {
+                        cout << "Nu exista clienti inregistrati.\n";
+                    } else {
+                        cout << "\n=== LISTA CLIENTI ===\n";
+                        for (size_t i = 0; i < clienti.size(); i++) {
+                            cout << i + 1 << ". " << clienti[i].getNume()
+                                 << " [" << clienti[i].getIdClient() << "]\n";
                         }
                     }
                     break;
-                case 3:
-                    cosCurent->afiseazaCos();
+                }
+
+                case 3: { // Creeaza comanda
+                    if (clienti.empty()) {
+                        cout << "Nu exista clienti. Adaugati mai intai un client.\n";
+                        break;
+                    }
+
+                    cout << "\nSelectati clientul:\n";
+                    for (size_t i = 0; i < clienti.size(); i++) {
+                        cout << i + 1 << ". " << clienti[i].getNume() << "\n";
+                    }
+
+                    int selClient;
+                    cout << "Alegere: ";
+                    cin >> selClient;
+                    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+                    if (selClient < 1 || selClient > clienti.size()) {
+                        cout << "Selectie invalida.\n";
+                        break;
+                    }
+
+                    auto comanda = make_unique<Comanda>(clienti[selClient - 1]);
+                    char continua = 'd';
+
+                    while (continua == 'd' || continua == 'D') {
+                        cout << "\nProduse disponibile:\n";
+                        for (size_t i = 0; i < produse.size(); i++) {
+                            cout << i + 1 << ". " << produse[i] << "\n";
+                        }
+
+                        int produsId, cantitate;
+                        cout << "Selectati produsul (numar): ";
+                        cin >> produsId;
+                        cout << "Cantitate: ";
+                        cin >> cantitate;
+                        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+                        if (produsId >= 1 && produsId <= produse.size()) {
+                            try {
+                                comanda->adaugaProdus(produse[produsId - 1], cantitate);
+                                cout << "Produs adaugat cu succes!\n";
+                            } catch (const EroareStoc& e) {
+                                cout << "Eroare: " << e.what() << endl;
+                            }
+                        } else {
+                            cout << "Produs inexistent.\n";
+                        }
+
+                        cout << "Adaugati alt produs? (d/n): ";
+                        cin >> continua;
+                        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                    }
+
+                    // Selectare metoda de plata
+                    cout << "\nSelectati metoda de plata:\n"
+                         << "1. Card\n"
+                         << "2. Transfer bancar\n"
+                         << "3. Cash\n"
+                         << "4. Crypto\n"
+                         << "Alegere: ";
+
+                    int metodaPlata;
+                    cin >> metodaPlata;
+                    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+                    double total = comanda->calculTotal();
+
+                    switch (metodaPlata) {
+                        case 1: {
+                            string cardNr, expDate;
+                            cout << "Numar card (16 cifre): ";
+                            getline(cin, cardNr);
+                            cout << "Data expirare (MM/AA): ";
+                            getline(cin, expDate);
+
+                            comanda->setPlata(make_unique<PlataCard>(
+                                "PLT" + to_string(time(nullptr) % 1000),
+                                total, cardNr, expDate
+                            ));
+                            break;
+                        }
+                        case 2: {
+                            string iban, banca;
+                            cout << "IBAN: ";
+                            getline(cin, iban);
+                            cout << "Nume banca: ";
+                            getline(cin, banca);
+
+                            comanda->setPlata(make_unique<PlataTransfer>(
+                                "PLT" + to_string(time(nullptr) % 1000),
+                                total, iban, banca
+                            ));
+                            break;
+                        }
+                        case 3: {
+                            string locatie;
+                            cout << "Locatie incasare: ";
+                            getline(cin, locatie);
+
+                            comanda->setPlata(make_unique<PlataCash>(
+                                "PLT" + to_string(time(nullptr) % 1000),
+                                total, locatie
+                            ));
+                            break;
+                        }
+                        case 4: {
+                            string wallet, crypto;
+                            double rate;
+                            cout << "Wallet address: ";
+                            getline(cin, wallet);
+                            cout << "Tip crypto (BTC/ETH/etc): ";
+                            getline(cin, crypto);
+                            cout << "Exchange rate (1 " << crypto << " = ? USD): ";
+                            cin >> rate;
+                            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+                            comanda->setPlata(make_unique<PlataCrypto>(
+                                "PLT" + to_string(time(nullptr) % 1000),
+                                total, wallet, crypto, rate
+                            ));
+                            break;
+                        }
+                        default:
+                            cout << "Metoda invalida. Plata setata pe cash.\n";
+                            comanda->setPlata(make_unique<PlataCash>(
+                                "PLT" + to_string(time(nullptr) % 1000),
+                                total, "Magazin"
+                            ));
+                    }
+
+                    try {
+                        comanda->finalizeazaComanda();
+                        comenzi.push_back(move(comanda));
+                        cout << "Comanda creata cu succes!\n";
+                    } catch (const exception& e) {
+                        cout << "Eroare la finalizare comanda: " << e.what() << endl;
+                    }
+
                     break;
-                case 4:
-                    manager.proceseazaComanda(*cosCurent);
+                }
+
+                case 4: { // Afiseaza comenzi
+                    if (comenzi.empty()) {
+                        cout << "Nu exista comenzi.\n";
+                    } else {
+                        cout << "\n=== LISTA COMENZI ===\n";
+                        for (const auto& comanda : comenzi) {
+                            comanda->afisareRezumat();
+                        }
+                    }
                     break;
-                case 5:
-                    cosCurent->golesteCos();
+                }
+
+                case 5: { // Demo polimorfism
+                    demoPolimorfismPlati();
                     break;
-                case 6:
-                    return;
-                case 0:
-                    std::cout << "Aplicatia se inchide...\n";
-                    exit(0);
+                }
+
+                case 6: { // Statistici
+                    cout << "\n=== STATISTICI ===\n"
+                         << "Numar total plati: " << Plata::getNumarTotalPlati() << "\n"
+                         << "Numar comenzi: " << Comanda::getNumarComenzi() << "\n"
+                         << "Numar clienti: " << clienti.size() << "\n"
+                         << "Numar produse: " << produse.size() << endl;
+                    break;
+                }
+
+                case 7: { // Iesire
+                    cout << "La revedere!\n";
+                    break;
+                }
+
                 default:
-                    std::cout << " Optiune invalida!\n";
+                    cout << "Optiune invalida. Incercati din nou.\n";
             }
-        } while (true);
+
+        } while (alegere != 7);
+
+    } catch (const exception& e) {
+        cerr << "Eroare neprevazuta: " << e.what() << endl;
+        return 1;
     }
 
-    void ruleaza() {
-        int optiunePrincipala;
-
-        std::cout << " BINE ATI VENIT IN SISTEMUL DE MANAGEMENT\n";
-
-        do {
-            std::cout << "\n=== MENIU PRINCIPAL ===\n";
-            std::cout << "1. Panel Vanzator\n";
-            std::cout << "2. Panel Client\n";
-            std::cout << "0. Iesire\n";
-            std::cout << "Alegeti opiunea: ";
-            std::cin >> optiunePrincipala;
-
-            switch (optiunePrincipala) {
-                case 1:
-                    ruleazaPanelVanzator();
-                    break;
-                case 2:
-                    ruleazaPanelClient();
-                    break;
-                case 0:
-                    std::cout << " La revedere!\n";
-                    break;
-                default:
-                    std::cout << " Optiune invalida!\n";
-            }
-        } while (optiunePrincipala != 0);
-    }
-};
-
-int main() {
-    Aplicatie app;
-    app.ruleaza();
     return 0;
 }
