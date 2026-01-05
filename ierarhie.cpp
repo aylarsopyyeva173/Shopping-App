@@ -1,4 +1,4 @@
-#include "../include/ierarhie.hpp"
+#include "ierarhie.hpp"
 #include <iostream>
 #include <algorithm>
 
@@ -84,4 +84,5 @@ std::unique_ptr<Plata> PlataCash::clone() const {
 
 std::string PlataCash::getDetalii() const {
     return Plata::getDetalii() + ", Locatie: " + locatieIncasare;
+
 }
