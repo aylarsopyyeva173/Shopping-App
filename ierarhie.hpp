@@ -68,4 +68,5 @@ public:
     std::string getDetalii() const override;
 };
 
+
 #endif
